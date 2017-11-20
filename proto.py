@@ -37,8 +37,9 @@ scheduled = sorted(
         for m
         in milestones
         if m["started_at"] or m["started_at_override"]
+        if not m['state'] == "done"
     ],
-    key=lambda m: m.start,
+    key=lambda m: m.end,
 )
 
 
@@ -46,11 +47,11 @@ def view_schedule():
     today = datetime.now(timezone.utc)
 
     factor = 2
-    first_start_date = scheduled[0].start
-    first_start_to_today = today - first_start_date
+    earliest_start_date = min(scheduled, key=lambda m: m.start).start
+    earliest_start_to_today = today - earliest_start_date
     for name, start, end in scheduled:
         td_span = end - start
-        td_to_start = start - first_start_date
+        td_to_start = start - earliest_start_date
         to_start_str = "".join([" "
                                 for d
                                 in range(
@@ -62,19 +63,23 @@ def view_schedule():
                                 math.floor(td_span.days / factor),
                             )])
         view = to_start_str + span_str
-        d = math.floor(first_start_to_today.days / factor)
+        d = math.floor(earliest_start_to_today.days / factor)
         view = "{}{}{}".format(view[:d], "*", view[d:])
         print(view, name)
 
+
 def view_unscheduled():
     unscheduled_milestones = filter(
-        lambda x: x["started_at_override"] == None,
+        lambda x: x["started_at_override"] == None and x["started_at"] == None,
         milestones,
     )
     print("\n".join([m["name"] for m in unscheduled_milestones]))
 
 if __name__ == "__main__":
-    if sys.argv[-1] == "unscheduled":
-        view_unscheduled()
-    else:
-        view_schedule()
+    print("Scheduled:")
+    print()
+    view_schedule()
+    print()
+    print("Unscheduled:")
+    print()
+    view_unscheduled()
