@@ -8,5 +8,5 @@ currently a prototype, just does milestone calendar stuff.
 
 # Usage
 
-proto.py unscheduled; display milestones with no start or end date
+`export CLUBHOUSE_API_KEY=<(clubhouse_api_token)[https://adops.1password.com/vaults/dmbgpvzkarc6sczy46mzcmfsvi/allitems/aqk6fzzjwirbyrti7z64a54bey]> python proto.py`
 
