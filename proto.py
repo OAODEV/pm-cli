@@ -1,85 +1,148 @@
 import json
-from dateutil import parser
-import math
-from datetime import datetime, timezone
-import sys
-import requests
 import os
+import requests
 from pprint import pprint as pp
 from collections import namedtuple
+from datetime import datetime
 
 
-Milestone = namedtuple("Milestone", "name start end")
+LOG_STORY_MOMENT = True
+
+
+StoryMoment = namedtuple("Story",
+    ("time "
+     "id archived blocked completed completed_at created_at description "
+     "deadline epic_id estimate project_id owner_ids name story_type "
+     "workflow_state_id requested_by_id"
+    )
+)
+
 
 CLUBHOUSE_API_TOKEN = os.environ["CLUBHOUSE_API_TOKEN"]
 
 
-milestones = requests.get(
-    "https://api.clubhouse.io/api/v2/milestones?token={}".format(
-        CLUBHOUSE_API_TOKEN,
-    ),
-).json()
+host = "https://api.clubhouse.io"
+
+def search(query):
+    return requests.get(
+        "{}/api/v2/search/stories?token={}".format(
+            host,
+            CLUBHOUSE_API_TOKEN,
+        ),
+        data={
+            "query": query,
+        }
+    ).json()
 
 
-def make_scheduled_milestone(m):
-    start = m["started_at_override"] or m["started_at"]
-    end = m["completed_at_override"] or m["completed_at"]
-    return Milestone(
-        m["name"],
-        parser.parse(start),
-        parser.parse(end),
+def get_next(results):
+    url = "{}{}".format(host, results["next"])
+    return requests.get(
+        url,
+        data={
+            "token": CLUBHOUSE_API_TOKEN
+        }
+    ).json()
+
+
+def get_resources(resource_type):
+    resources_response = requests.get(
+        "{}/api/v2/{}?token={}".format(host, resource_type, CLUBHOUSE_API_TOKEN)
+    ).json()
+    resources = {}
+    for r in resources_response:
+        resources[r['id']] = r
+    return resources
+
+
+members = get_resources("members")
+projects = get_resources("projects")
+epics = get_resources("epics")
+
+workflows = get_resources("workflows")
+workflow_states = {}
+for id_, w in workflows.items():
+    for s in w["states"]:
+        workflow_states[s['id']] = s
+
+
+def translate_field(field_name, value):
+    if field_name in ["member_id", "requested_by_id"]:
+        member = members.get(value)
+        if member:
+            return member["profile"]["name"]
+        else:
+            return "Unknown Member"
+    if field_name == "owner_ids":
+        return [a for a in map(
+            lambda x: translate_field("member_id", x),
+            value,
+        )]
+    if field_name == "workflow_state_id":
+        return workflow_states.get(value, {"name": None})["name"]
+    if field_name == "project_id":
+        return projects.get(value, {"name": None})["name"]
+    if field_name == "epic_id":
+        return epics.get(value, {"name": None})["name"]
+    return value
+
+
+def log_story_moment(sm):
+    fields = {}
+    excluded_fields = ["description"]
+
+    for f in StoryMoment._fields:
+        translated_fieldname = f
+        if f.endswith("_id"):
+            translated_fieldname = f[:-3]
+        if f.endswith("_ids"):
+            translated_fieldname = "{}s".format(f[:-4])
+        fields[translated_fieldname] = translate_field(f, getattr(sm, f))
+
+    print("StoryMoment({})".format(
+        ", ".join(
+            ["{}={}".format(k, v)
+             for (k, v)
+             in fields.items()
+             if k not in excluded_fields
+            ]
+        )
+    ))
+
+
+def process_story(story):
+    sm = StoryMoment(
+        datetime.now().isoformat(),
+        *[story[f]
+          for f
+          in StoryMoment._fields
+          if f != "time"
+        ]
     )
+    if LOG_STORY_MOMENT:
+        log_story_moment(sm)
+    return sm
 
 
-scheduled = sorted(
-    [
-        make_scheduled_milestone(m)
-        for m
-        in milestones
-        if m["started_at"] or m["started_at_override"]
-        if not m['state'] == "done"
-    ],
-    key=lambda m: m.end,
-)
+def process_results(results, stories=[]):
+    print("processed {} stories, processing {} stories".format(
+        len(stories),
+        len(results["data"]),
+    ))
+    stories += [process_story(s) for s in results['data']]
+    if results['next']:
+        stories = process_results(get_next(results), stories)
+    return stories
 
 
-def view_schedule():
-    today = datetime.now(timezone.utc)
+def main():
+    stories = process_results(search("is:unstarted"))
+    stories += process_results(search("is:started"))
 
-    factor = 2
-    earliest_start_date = min(scheduled, key=lambda m: m.start).start
-    earliest_start_to_today = today - earliest_start_date
-    for name, start, end in scheduled:
-        td_span = end - start
-        td_to_start = start - earliest_start_date
-        to_start_str = "".join([" "
-                                for d
-                                in range(
-                                    math.floor(td_to_start.days / factor),
-                                )])
-        span_str = "".join(["-"
-                            for d
-                            in range(
-                                math.floor(td_span.days / factor),
-                            )])
-        view = to_start_str + span_str
-        d = math.floor(earliest_start_to_today.days / factor)
-        view = "{}{}{}".format(view[:d], "*", view[d:])
-        print(view, name)
-
-
-def view_unscheduled():
-    unscheduled_milestones = filter(
-        lambda x: x["started_at_override"] == None and x["started_at"] == None,
-        milestones,
-    )
-    print("\n".join([m["name"] for m in unscheduled_milestones]))
 
 if __name__ == "__main__":
-    print("Scheduled:")
-    print()
-    view_schedule()
-    print()
-    print("Unscheduled:")
-    print()
-    view_unscheduled()
+    while True:
+        main()
+        minute = 60
+        hour = 60 * minute
+        time.sleep(8 * hour)

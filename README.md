@@ -18,4 +18,4 @@ docker build -t pm .
 docker run -e CLUBHOUSE_API_TOKEN=<clubhouse_api_token> pm
 ```
 
-Find the [clubhouse api token](https://adops.1password.com/vaults/dmbgpvzkarc6sczy46mzcmfsvi/allitems/aqk6fzzjwirbyrti7z64a54bey) here.
+Find the `clubhouse_api_token` in the keybase secret repo
