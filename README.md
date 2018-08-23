@@ -18,4 +18,4 @@ docker build -t pm .
 docker run -e CLUBHOUSE_API_TOKEN=<clubhouse_api_token> pm
 ```
 
-Find the `clubhouse_api_token` in the keybase secret repo
+Find the `app.yaml` and `clubhouse_api_token` in the keybase secret repo
