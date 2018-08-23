@@ -4,9 +4,24 @@ import requests
 from pprint import pprint as pp
 from collections import namedtuple
 from datetime import datetime
+import time
+
+from google.cloud import logging
 
 
 LOG_STORY_MOMENT = True
+try:
+    logging_client = logging.Client()
+    logger = logging_client.logger("StoryMomentLogger")
+except:
+    logger = None
+
+
+def log_struct(l):
+    if logger:
+        logger.log_struct(l)
+    else:
+        print(l)
 
 
 StoryMoment = namedtuple("Story",
@@ -88,7 +103,7 @@ def translate_field(field_name, value):
 
 
 def log_story_moment(sm):
-    fields = {}
+    fields = {"type": "StoryMoment"}
     excluded_fields = ["description"]
 
     for f in StoryMoment._fields:
@@ -99,15 +114,14 @@ def log_story_moment(sm):
             translated_fieldname = "{}s".format(f[:-4])
         fields[translated_fieldname] = translate_field(f, getattr(sm, f))
 
-    print("StoryMoment({})".format(
-        ", ".join(
-            ["{}={}".format(k, v)
-             for (k, v)
-             in fields.items()
-             if k not in excluded_fields
-            ]
-        )
-    ))
+    log_struct(
+        {
+            k:v
+            for (k, v)
+            in fields.items()
+            if k not in excluded_fields
+        }
+    )
 
 
 def process_story(story):
