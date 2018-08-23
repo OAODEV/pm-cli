@@ -159,4 +159,4 @@ if __name__ == "__main__":
         main()
         minute = 60
         hour = 60 * minute
-        time.sleep(8 * hour)
+        time.sleep(12 * hour)
