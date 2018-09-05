@@ -1,3 +1,4 @@
+Replaced by github.com/OAODEV/clubhouse-leadtime-extract
 
 # pm-cli
 Product management CLI for interacting with Clubhouse.io
